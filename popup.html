@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Web Clipper to Word</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+      width:480px;min-height:200px;max-height:660px;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      font-size:13px;background:#f8f9fc;color:#1e1e2e;display:flex;flex-direction:column;
+    }
+    header{
+      background:linear-gradient(135deg,#1a56db,#2563eb);
+      color:#fff;padding:11px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;
+    }
+    header h1{font-size:14px;font-weight:600;flex:1}
+    .hbadge{background:rgba(255,255,255,.22);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:600}
+    #btn-screenshot{
+      display:inline-flex;align-items:center;gap:5px;
+      padding:5px 11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+      border-radius:7px;color:#fff;font-size:12px;cursor:pointer;font-family:inherit;transition:background .15s;
+    }
+    #btn-screenshot:hover{background:rgba(255,255,255,.28)}
+
+    /* PDF capture bar — shown when active tab is a PDF/file */
+    #pdf-bar{
+      display:none;flex-shrink:0;flex-direction:column;
+      background:#fef9c3;border-bottom:2px solid #fde047;padding:10px 13px;gap:8px;
+    }
+    #pdf-bar.visible{display:flex}
+    .pdf-bar-top{display:flex;align-items:flex-start;gap:8px}
+    .pdf-bar-top svg{flex-shrink:0;margin-top:1px}
+    .pdf-bar-top span{flex:1;font-size:11px;color:#713f12;line-height:1.55}
+    #btn-pdf-capture{
+      width:100%;padding:8px;background:#eab308;color:#fff;border:none;
+      border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+      display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s;
+    }
+    #btn-pdf-capture:hover{background:#ca8a04}
+    #btn-pdf-capture:active{background:#a16207}
+
+    /* Category picker inside popup — shown after clipboard is read */
+    #pdf-picker{display:none;flex-direction:column;gap:6px;padding:10px 13px;background:#f0f9ff;border-bottom:1px solid #bae6fd}
+    #pdf-picker.visible{display:flex}
+    #pdf-preview{font-size:11px;color:#0369a1;background:#e0f2fe;border-radius:5px;padding:6px 8px;max-height:48px;overflow:hidden;line-height:1.4}
+    #pdf-picker-label{font-size:12px;font-weight:600;color:#0c4a6e}
+    #pdf-cat-btns{display:flex;flex-wrap:wrap;gap:5px}
+    .pdf-cat-btn{padding:4px 11px;background:#fff;color:#1a56db;border:1px solid #bfdbfe;border-radius:16px;font-size:12px;cursor:pointer;font-family:inherit}
+    .pdf-cat-btn:hover{background:#dbeafe}
+    #pdf-new-row{display:flex;gap:6px}
+    #pdf-new-inp{flex:1;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;outline:none}
+    #pdf-save-btn{padding:5px 12px;background:#1a56db;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit}
+
+    /* File-access warning */
+    #file-warn{
+      display:none;background:#fff7ed;border-bottom:1px solid #fed7aa;
+      padding:8px 12px;font-size:11px;color:#9a3412;line-height:1.5;flex-shrink:0;
+    }
+    #file-warn.visible{display:block}
+    #file-warn a{color:#1a56db;cursor:pointer;text-decoration:underline}
+
+    /* Tabs */
+    #tab-bar{
+      display:flex;align-items:stretch;background:#fff;
+      border-bottom:2px solid #e5e7eb;flex-shrink:0;overflow-x:auto;scrollbar-width:none;
+    }
+    #tab-bar::-webkit-scrollbar{display:none}
+    .tab{
+      padding:8px 13px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;
+      color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;
+      display:flex;align-items:center;gap:4px;transition:color .15s,border-color .15s;
+    }
+    .tab:hover{color:#1a56db}
+    .tab.active{color:#1a56db;border-bottom-color:#1a56db;font-weight:600}
+    .tab-count{background:#e0e7ff;color:#3730a3;border-radius:9px;padding:1px 5px;font-size:10px;font-weight:600}
+    .tab.active .tab-count{background:#1a56db;color:#fff}
+    #btn-add-section{
+      padding:7px 11px;font-size:12px;color:#9ca3af;cursor:pointer;
+      border:none;background:none;white-space:nowrap;margin-left:auto;flex-shrink:0;
+    }
+    #btn-add-section:hover{color:#1a56db}
+
+    /* Toolbar */
+    .toolbar{
+      display:flex;gap:5px;padding:7px 10px;background:#fff;
+      border-bottom:1px solid #f1f5f9;flex-shrink:0;align-items:center;flex-wrap:wrap;
+    }
+    .btn{
+      display:inline-flex;align-items:center;gap:4px;padding:5px 11px;
+      border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;
+      border:none;transition:background .15s,opacity .15s;white-space:nowrap;
+    }
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary{background:#1a56db;color:#fff}
+    .btn-primary:not(:disabled):hover{background:#1648c0}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+    .btn-danger:not(:disabled):hover{background:#fee2e2}
+    .btn-ghost{background:#f3f4f6;color:#374151}
+    .btn-ghost:not(:disabled):hover{background:#e5e7eb}
+    .spacer{flex:1}
+
+    /* Sync bar */
+    .sync-bar{
+      display:flex;align-items:center;gap:6px;padding:6px 10px;
+      background:#fffbeb;border-bottom:1px solid #fde68a;flex-shrink:0;
+    }
+    .sync-bar span{font-size:11px;color:#92400e;flex:1}
+    .btn-sync{
+      display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;
+      font-size:11px;font-weight:500;cursor:pointer;border:none;font-family:inherit;white-space:nowrap;
+    }
+    .btn-sync-export{background:#f59e0b;color:#fff}
+    .btn-sync-export:hover{background:#d97706}
+    .btn-sync-import{background:#fff;color:#92400e;border:1px solid #fcd34d}
+    .btn-sync-import:hover{background:#fef3c7}
+
+    /* List */
+    #list-container{flex:1;overflow-y:auto;padding:8px 10px}
+    .empty-state{text-align:center;color:#9ca3af;padding:36px 20px;line-height:1.8}
+    .empty-state svg{opacity:.3;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
+
+    .clip-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:6px;position:relative}
+    .clip-card:hover{border-color:#93c5fd}
+    .clip-img{width:100%;max-height:120px;object-fit:contain;object-position:left;border-radius:5px;border:1px solid #e5e7eb;margin-bottom:6px;display:block;background:#f8f9fc}
+    .clip-meta{display:flex;align-items:flex-start;gap:6px;margin-bottom:4px}
+    .clip-title{font-weight:600;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .clip-date{font-size:11px;color:#9ca3af;flex-shrink:0}
+    .clip-url{font-size:11px;color:#1a56db;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;margin-bottom:4px;cursor:pointer}
+    .clip-url:hover{text-decoration:underline}
+    .clip-text{font-size:12px;color:#4b5563;line-height:1.5;max-height:48px;overflow:hidden;position:relative}
+    .clip-text::after{content:"";position:absolute;bottom:0;left:0;right:0;height:16px;background:linear-gradient(transparent,#fff)}
+    .type-badge{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600;background:#fef9c3;color:#854d0e;border:1px solid #fde68a;margin-right:3px}
+    .type-badge.text{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+    .type-badge.pdf{background:#fef3c7;color:#92400e;border-color:#fde68a}
+    .card-foot{display:flex;gap:4px;margin-top:7px;align-items:center}
+    .cat-badge{font-size:10px;padding:2px 8px;border-radius:9px;background:#eff6ff;color:#1a56db;border:1px solid #bfdbfe;font-weight:500}
+    .btn-move{font-size:11px;padding:3px 7px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;cursor:pointer}
+    .btn-move:hover{background:#f1f5f9}
+    .btn-del-clip{background:none;border:none;cursor:pointer;color:#d1d5db;padding:3px;border-radius:4px}
+    .btn-del-clip:hover{color:#ef4444;background:#fef2f2}
+    .move-menu{position:absolute;right:8px;bottom:32px;z-index:100;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:4px 0;min-width:160px}
+    .move-item{padding:7px 14px;font-size:12px;cursor:pointer;color:#1e293b}
+    .move-item:hover{background:#f0f9ff;color:#1a56db}
+
+    #status{font-size:11px;color:#059669;padding:6px 12px;background:#ecfdf5;border-top:1px solid #d1fae5;flex-shrink:0;display:none}
+    #status.visible{display:block}
+    #status.error{background:#fef2f2;color:#dc2626;border-color:#fecaca}
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="17" height="17" fill="none" viewBox="0 0 24 24">
+    <path fill="rgba(255,255,255,.85)" d="M7 4h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/>
+    <path stroke="rgba(26,86,219,.7)" stroke-width="1.5" stroke-linecap="round" d="M9 9h6M9 12h6M9 15h4"/>
+  </svg>
+  <h1>Web Clipper to Word</h1>
+  <span class="hbadge" id="total-badge">0 clips</span>
+  <button id="btn-screenshot" title="Take a screenshot (Ctrl+Shift+S)">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+      <rect x="2" y="6" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+      <circle cx="12" cy="13" r="3" stroke="currentColor" stroke-width="1.8"/>
+      <path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 6V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1"/>
+    </svg>
+    Screenshot
+  </button>
+</header>
+
+<!-- PDF / local file capture bar -->
+<div id="pdf-bar">
+  <div class="pdf-bar-top">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+      <path fill="#fde047" d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/>
+      <path stroke="#854d0e" stroke-width="1.5" stroke-linecap="round" d="M9 8h6M9 11h6M9 14h4"/>
+    </svg>
+    <span id="pdf-bar-msg">
+      <strong>PDF detected.</strong>
+      Select text in the PDF → press <strong>Ctrl+C</strong> → click the button below.
+    </span>
+  </div>
+  <button id="btn-pdf-capture">
+    <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2
+           M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/>
+    </svg>
+    📄 Capture Clipboard (Ctrl+Shift+Y)
+  </button>
+</div>
+
+<!-- File-access warning (for file:// without permission) -->
+<div id="file-warn">
+  ⚠ <strong>Extra step needed for local PDF files:</strong><br>
+  Go to <strong>edge://extensions</strong> (or chrome://extensions) →
+  find <strong>Web Clipper to Word</strong> → click <strong>Details</strong> →
+  enable <strong>"Allow access to file URLs"</strong>, then reload the PDF.
+</div>
+
+<!-- Inline category picker (appears after clipboard is read) -->
+<div id="pdf-picker">
+  <div id="pdf-picker-label">📄 Save to which section?</div>
+  <div id="pdf-preview"></div>
+  <div id="pdf-cat-btns"></div>
+  <div id="pdf-new-row">
+    <input id="pdf-new-inp" type="text" placeholder="New section name…"/>
+    <button id="pdf-save-btn">Save</button>
+  </div>
+</div>
+
+<div id="tab-bar">
+  <button id="btn-add-section">＋ New Section</button>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-primary" id="btn-export" disabled>
+    <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 4v12M8 12l4 4 4-4"/>
+    </svg>Export Section
+  </button>
+  <button class="btn btn-ghost" id="btn-export-all" disabled>Export All</button>
+  <span class="spacer"></span>
+  <button class="btn btn-danger" id="btn-clear-section" disabled>Clear Section</button>
+</div>
+
+<div class="sync-bar">
+  <span>🔄 Sync between browsers:</span>
+  <button class="btn-sync btn-sync-export" id="btn-backup">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 4v12M8 12l4 4 4-4"/>
+    </svg>Export Backup
+  </button>
+  <button class="btn-sync btn-sync-import" id="btn-restore">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        d="M4 8v-2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2M12 20V8M8 12l4-4 4 4"/>
+    </svg>Import Backup
+  </button>
+  <input type="file" id="restore-file" accept=".json" style="display:none"/>
+</div>
+
+<div id="list-container"></div>
+<div id="status"></div>
+<script src="popup.js"></script>
+</body>
+</html>
